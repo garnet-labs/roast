@@ -1,0 +1,57 @@
+name: Dependency install
+
+# Installs the gems from the Gemfile.lock committed at the pull request's head
+# commit, on a real runner, from rubygems.org. A gem upgrade changes what the
+# install fetches and which native extensions it builds, and this job is where
+# that shows up. The install runs under the Garnet sensor, so the execution
+# chains and the destinations they reach are recorded for the exact head
+# commit that was checked out.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'Gemfile'
+      - 'Gemfile.lock'
+      - 'roast-ai.gemspec'
+      - '.github/workflows/garnet-dependency-install.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-install-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dependency-install:
+    name: Gem install (recorded)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
+
+      # No bundler cache: the install has to fetch every gem so the recording
+      # shows what a fresh install of this lockfile actually reaches.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: false
+
+      - name: Install gems
+        run: bundle install --jobs 4
+
+      # Native extension builds can spawn children that outlive the install.
+      # Give the sensor a moment to record them before the profile is finalized.
+      - name: Let sensor settle
+        if: always()
+        run: sleep 45

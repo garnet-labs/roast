@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y ripgrep graphviz wamerican
       - uses: ruby/setup-ruby@v1
