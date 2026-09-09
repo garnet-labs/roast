@@ -1,0 +1,54 @@
+name: Shell lineage
+
+# Executes the repository's own shell-sanitization example workflow on a real
+# runner under the Garnet sensor. The example defines four cmd cogs that are
+# configured identically and all exit zero; the difference between them is not
+# in the result but in how each command is spawned. A cog whose input block
+# returns a single interpolated string hands one argument to Open3.popen3 and
+# is therefore executed through a shell, while the cogs that return an
+# argument array or escape their input are exec'd directly. That distinction
+# is invisible in the diff, invisible in the exit status, and invisible to a
+# test oracle. It is visible in the recorded process lineage.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shell-lineage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  shell-lineage:
+    name: Shell lineage (recorded)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # The example uses only cmd cogs, so no model provider, API key or
+      # network egress is required to execute it.
+      - name: Run shell sanitization example
+        run: bundle exec roast execute examples/shell_sanitization.rb
+
+      # Shell-spawned children can outlive the cog that started them.
+      - name: Let sensor settle
+        if: always()
+        run: sleep 45
