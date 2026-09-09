@@ -5,6 +5,8 @@ source "https://rubygems.org"
 git_source(:github) { |repo_name| "https://github.com/#{repo_name}" }
 
 # Specify your gem's dependencies in roast-ai.gemspec
+
+gem "cli-ui", github: "Shopify/cli-ui", branch: "main"
 gemspec
 
 group :development, :test do

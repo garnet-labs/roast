@@ -5,7 +5,8 @@ name: Dependency install
 # install fetches and which native extensions it builds, and this job is where
 # that shows up. The install runs under the Garnet sensor, so the execution
 # chains and the destinations they reach are recorded for the exact head
-# commit that was checked out.
+# commit that was checked out. Runtime setup happens before the sensor starts,
+# so the recording is scoped to the install alone.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -35,17 +36,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Garnet Runtime Visibility
-        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
-        with:
-          api_token: ${{ secrets.GARNET_API_TOKEN }}
-
       # No bundler cache: the install has to fetch every gem so the recording
       # shows what a fresh install of this lockfile actually reaches.
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           bundler-cache: false
+
+      # The sensor starts here, after checkout and the Ruby toolchain are in
+      # place, so the recorded window contains only the install itself. Every
+      # destination in the profile is then attributable to the lockfile.
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
 
       - name: Install gems
         run: bundle install --jobs 4
