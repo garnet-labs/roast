@@ -1,3 +1,10 @@
+GIT
+  remote: https://github.com/Shopify/cli-ui
+  revision: 6bdefd1d06305e5d6ae312ac76f9c88f88658dda
+  branch: main
+  specs:
+    cli-ui (2.7.0)
+
 PATH
   remote: .
   specs:
@@ -235,6 +242,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  cli-ui!
   guard
   guard-minitest
   minitest (~> 5.0)
