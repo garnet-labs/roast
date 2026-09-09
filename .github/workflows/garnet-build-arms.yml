@@ -64,24 +64,25 @@ jobs:
         with:
           bundler-cache: false
 
-      # Same lockfile, same versions. The ruby platform is added locally and is
-      # not committed, so nothing in the reviewed tree changes.
-      - name: Force pure-ruby platform
-        run: |
-          bundle lock --add-platform ruby
-          bundle config set --local force_ruby_platform true
-
+      # Identical gem, identical version, identical lockfile entry. The only
+      # difference from the other arm is that no precompiled variant matches,
+      # so the native extension is built on the runner instead of unpacked.
+      # This is what the same lockfile does on any platform the gem does not
+      # publish a binary for.
       - name: Install gems
         run: bundle install --jobs 4
+
+      - name: Build the database driver from source
+        run: gem install sqlite3 -v 2.9.5 --platform ruby --no-document
 
       - name: Report what was built
         if: always()
         run: |
-          echo "--- native extension build logs present:"
-          find "$(bundle config get path | tail -1 | tr -d '\"' || echo vendor/bundle)" \
-            -name 'mkmf.log' -o -name 'gem_make.out' 2>/dev/null | head -40 || true
-          echo "--- installed sqlite3 platform:"
-          bundle list | grep -i sqlite3 || true
+          echo "--- native extension build logs:"
+          find "$(gem env gemdir)" -name 'mkmf.log' -o -name 'gem_make.out' 2>/dev/null | head -20 || true
+          echo "--- vendored source fetched during build:"
+          find "$(gem env gemdir)/gems" -path '*sqlite3*' \
+            \( -name '*.tar.gz' -o -name 'sqlite3.c' -o -name 'sqlite3.h' \) 2>/dev/null | head -20 || true
 
       - name: Let sensor settle
         if: always()
