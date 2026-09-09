@@ -1,0 +1,88 @@
+name: Build arms
+
+# Two install arms against one commit, differing in a single variable: whether
+# bundler is allowed to use the precompiled platform gems named in the
+# lockfile, or is forced onto the pure-ruby variants and therefore has to
+# compile the native extensions on the runner.
+#
+# The lockfile, the Gemfile and the gem versions are identical in both arms.
+# The only difference is how the same declared dependencies get built. This
+# job pair exists to establish, on a real workload, what the recorded profile
+# does and does not represent when execution is a local compile rather than a
+# fetch.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  precompiled:
+    name: Install (precompiled)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: false
+
+      - name: Install gems
+        run: bundle install --jobs 4
+
+      - name: Let sensor settle
+        if: always()
+        run: sleep 45
+
+  from_source:
+    name: Install (forced source build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Garnet Runtime Visibility
+        uses: garnet-org/action@c747ff1f597c84579e10173301a31c30bb815181 # v2.3.0-rc.1
+        with:
+          api_token: ${{ secrets.GARNET_API_TOKEN }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: false
+
+      # Same lockfile, same versions. The ruby platform is added locally and is
+      # not committed, so nothing in the reviewed tree changes.
+      - name: Force pure-ruby platform
+        run: |
+          bundle lock --add-platform ruby
+          bundle config set --local force_ruby_platform true
+
+      - name: Install gems
+        run: bundle install --jobs 4
+
+      - name: Report what was built
+        if: always()
+        run: |
+          echo "--- native extension build logs present:"
+          find "$(bundle config get path | tail -1 | tr -d '\"' || echo vendor/bundle)" \
+            -name 'mkmf.log' -o -name 'gem_make.out' 2>/dev/null | head -40 || true
+          echo "--- installed sqlite3 platform:"
+          bundle list | grep -i sqlite3 || true
+
+      - name: Let sensor settle
+        if: always()
+        run: sleep 45
