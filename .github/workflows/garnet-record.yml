@@ -29,6 +29,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep graphviz wamerican
       - uses: ruby/setup-ruby@f9c4492e86def3e644ab32a0ef185eda5b0c20d0 # v1
         with:
+          ruby-version: '3.4'
           bundler-cache: false
       - name: Install dependencies
         run: bundle install
